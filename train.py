@@ -7,7 +7,7 @@ from base_model import BaseModel
 
 parser = argparse.ArgumentParser(description="Parser for KUCNet")
 parser.add_argument('--data_path', type=str, default='data/last-fm/')
-parser.add_argument('--seed', type=str, default=1234)
+parser.add_argument('--seed', type=str, default=42)
 parser.add_argument('--K', type=int, default=50)
 parser.add_argument('--gpu', type=int, default=0)
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
         opts.n_batch = 10
         opts.n_tbatch = 10
         opts.K = 70
-    elif dataset == 'last-fm' :
+    elif dataset in ['last-fm', 'last-fm-reproduce']:
         opts.lr = 0.0004
         opts.decay_rate = 0.994
         opts.lamb = 0.00014
@@ -103,7 +103,7 @@ if __name__ == '__main__':
         opts.n_batch = 24
         opts.n_tbatch = 24
         opts.K = 170
-    elif dataset == 'amazon-book' :
+    elif dataset in ['amazon-book', 'amazon-book-reproduce']:
         opts.lr = 0.0012
         opts.decay_rate = 0.994  
         opts.lamb = 0.000014      
@@ -161,7 +161,7 @@ if __name__ == '__main__':
     model = BaseModel(opts, loader)
 
     best_recall = 0
-    for epoch in range(40):
+    for epoch in range(15):
     
         print('epoch ',epoch)
         recall,ndcg, out_str = model.train_batch()
