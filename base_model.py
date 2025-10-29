@@ -80,7 +80,7 @@ class BaseModel(object):
         print(out_str)
         return recall, ndcg,  out_str
 
-    def test_one_user(self, u, score, K = 20):
+    def test_one_user(self, u, score, K = 10):
         try:
             training_items = self.known_user_set[u]
         except Exception:
