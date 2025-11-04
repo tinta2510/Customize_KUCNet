@@ -155,6 +155,7 @@ class KUCNet_trans(torch.nn.Module):
             hidden, h0 = self.gate (hidden.unsqueeze(0), h0)  
             hidden = hidden.squeeze(0)
  
+        # Dot product to get final scores
         scores = self.W_final(hidden).squeeze(-1)   
 
         scores_all = torch.zeros((n, self.n_items)).cuda()  

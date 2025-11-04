@@ -94,6 +94,7 @@ class BaseModel(object):
 
         item_score = {}
         for i in test_items:
+            # NOTE: items not included in subgraph will have score 0
             item_score[i] = score[i-self.n_users]
         K_item_score = heapq.nlargest(K, item_score, key=item_score.get)
 

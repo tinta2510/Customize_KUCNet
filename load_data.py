@@ -47,7 +47,8 @@ class DataLoader:
         # add inverse
         self.d_triple  = self.double_triple(self.triple)
         
-        # add interact and user into triplets
+        # add interact and user into triplets -->
+        # build collaborative knowledge graph from user-item interactions and knowledge graph triples
         self.fact_data, self.known_data = self.interact_triple(self.d_triple)   
 
         # use user-kg 
@@ -110,6 +111,8 @@ class DataLoader:
         # consider  additional relations  'interact' and 'in-interact'.
         copy_tri = triples.copy()
         for id, [h, r, t] in enumerate(copy_tri):
+            # Increase entity id and relation id to avoid conflict with user ids and interact relation id.
+            # To build Collaborative KG
             copy_tri[id] = [h + self.n_users, r + 2, t + self.n_users] 
         
         fact_user_triple = []
@@ -198,13 +201,31 @@ class DataLoader:
         return np.array(fcf), np.array(train_cf)
 
     def load_graph(self, triples):      
+        """
+        Input:
+            triples: list of triples
+            - User-item interactions → [u, 0, i] (relation 0 = "interact")
+            - Inverse interactions → [i, 1, u] (relation 1 = "in-interact")
+            - KG facts → [h, r, t] from kg.txt
+            - Inverse KG facts → [t, r+n_rel, h] via double_triple()
+        """
+        # add self-loop
+        # idd = [(i, 2*self.n_rel+2, i) for i in range(self.n_nodes)]
         idd = np.concatenate([np.expand_dims(np.arange(self.n_nodes),1), (2*self.n_rel+2)*np.ones((self.n_nodes, 1)), np.expand_dims(np.arange(self.n_nodes),1)], 1)
 
+        # Merge with existing triples
         self.KG = np.concatenate([np.array(triples), idd], 0)
- 
         self.n_fact = len(self.KG)
-        self.M_sub = csr_matrix((np.ones((self.n_fact,)), (np.arange(self.n_fact), self.KG[:,0])), shape=(self.n_fact, self.n_nodes))
-
+        
+        # build sparse matrix 
+        # Each row = one edge (triplet) from self.KG.
+        # Each column = one node index.
+        # Entry = 1 if that edge’s head node equals the column index.
+        # So M_sub[i, j] = 1 if the i-th edge originates from node j.
+        self.M_sub = csr_matrix(
+            (np.ones((self.n_fact,)), # values to be placed in the sparse matrix
+             (np.arange(self.n_fact), self.KG[:,0])), # row indices, column indices
+            shape=(self.n_fact, self.n_nodes))
 
     def load_test_graph(self, triples):  
         idd = np.concatenate([np.expand_dims(np.arange(self.n_nodes),1), (2*self.n_rel+2)*np.ones((self.n_nodes, 1)), np.expand_dims(np.arange(self.n_nodes),1)], 1)
