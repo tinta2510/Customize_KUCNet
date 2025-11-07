@@ -35,6 +35,7 @@ class DataLoader:
 
         if task_dir == 'data/Dis_5fold_item/'or  task_dir == 'data/new_last-fm/'or  task_dir == 'data/new_amazon-book/'or  task_dir == 'data/new_alibaba-fashion/':
             self.item_set = self.cf_to_item_set(self.all_cf)
+            # read user–item interactions, split to fact/train parts
             self.facts_cf, self.train_cf = self.generate_inductive_train(self.all_cf)
         else:
             self.facts_cf = self.all_cf[0:n_all*6//7]    
@@ -285,8 +286,11 @@ class DataLoader:
             M_sub = self.tM_sub
         
         # nodes: n(node) x 2 with (batch_idx, node_idx)
-        node_1hot = csr_matrix((np.ones(len(nodes)), (nodes[:,1], nodes[:,0])), shape=(self.n_nodes, nodes.shape[0]))
-        edge_1hot = M_sub.dot(node_1hot)
+        node_1hot = csr_matrix(
+            (np.ones(len(nodes)), # values to be placed in the sparse matrix
+             (nodes[:,1], nodes[:,0])), # coressponding row indices, column indices
+            shape=(self.n_nodes, nodes.shape[0]))
+        edge_1hot = M_sub.dot(node_1hot) # pick outgoing edges
         edges = np.nonzero(edge_1hot)
         sampled_edges = np.concatenate([np.expand_dims(edges[1],1), KG[edges[0]]], axis=1)     # (batch_idx, head, rela, tail)
         sampled_edges = torch.LongTensor(sampled_edges).cuda()
@@ -297,7 +301,7 @@ class DataLoader:
 
         sampled_edges = torch.cat([sampled_edges, head_index.unsqueeze(1), tail_index.unsqueeze(1)], 1)
        
-        mask = sampled_edges[:,2] == (self.n_rel*2 + 2)
+        mask = sampled_edges[:,2] == (self.n_rel*2 + 2) # self-loop
         _, old_idx = head_index[mask].sort()
         old_nodes_new_idx = tail_index[mask][old_idx]
 
