@@ -30,7 +30,7 @@ class GNNLayer(torch.nn.Module):
         
         # n_rel*2 (inverse rels) + 1 (self-loop) + 2 (user-item, item-user)
         self.rel_alpha = nn.Embedding(2*n_rel+1+2, 1)
-        nn.init.ones_(self.rela_scalar.weight) 
+        nn.init.ones_(self.rel_alpha.weight) 
         
     def forward(self, q_sub, q_rel, hidden, edges, nodes, id_layer, n_layer ,old_nodes_new_idx):
         # edges:  [batch_idx, head, rela, tail, old_idx, new_idx]
@@ -66,7 +66,7 @@ class GNNLayer(torch.nn.Module):
             edges = torch.cat([edges[:,0:5], tail_index.unsqueeze(1)], 1)
             
             head_index = edges[:,4]
-            idd_mask = edges[:,2] == (self.n_rel*2 + 2)
+            idd_mask = edges[:,2] == (self.n_rel*2 + 2) # mask self-loop
             _, old_idx = head_index[idd_mask].sort()
             old_nodes_new_idx = tail_index[idd_mask][old_idx]
         
@@ -108,7 +108,7 @@ class GNNLayer(torch.nn.Module):
         # return hidden_new, t_nodes, final_nodes, old_nodes_new_idx, sampled_nodes_idx, alpha, edges
         
         hs = hidden[sub] # source node embeddings
-        rela_alpha = self.rela_scalar(rel).unsqueeze(1)
+        rela_alpha = self.rel_alpha(rel)
         message = rela_alpha * hs
         
         # --- Degree normalization ---
