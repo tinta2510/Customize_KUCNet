@@ -205,20 +205,21 @@ class KUCNet_trans(torch.nn.Module):
             hidden, h0 = self.gate (hidden.unsqueeze(0), h0)  
             hidden = hidden.squeeze(0)
             
-            # NEW: add type bias each layer (residual inject of node-type embedding)
-            # nodes: [batch_row, raw_node_id]
-            raw = nodes[:, 1]
-            batch = nodes[:, 0]
-            # compute type ids
-            is_user  = (raw < self.n_users)
-            is_item  = (raw >= self.n_users) & (raw < self.n_users + self.n_items)
-            # target user == q_sub[batch]
-            is_target = is_user & (raw == q_sub[batch])
-            type_ids = torch.where(is_target, torch.tensor(0, device=raw.device),
-                          torch.where(is_item,   torch.tensor(1, device=raw.device),
-                          torch.where(is_user,   torch.tensor(2, device=raw.device),
-                                                  torch.tensor(3, device=raw.device))))
-            hidden = hidden + self.type_embed(type_ids)           
+            if i != self.n_layer - 1:
+                # NEW: add type bias each layer (residual inject of node-type embedding)
+                # nodes: [batch_row, raw_node_id]
+                raw = nodes[:, 1]
+                batch = nodes[:, 0]
+                # compute type ids
+                is_user  = (raw < self.n_users)
+                is_item  = (raw >= self.n_users) & (raw < self.n_users + self.n_items)
+                # target user == q_sub[batch]
+                is_target = is_user & (raw == q_sub[batch])
+                type_ids = torch.where(is_target, torch.tensor(0, device=raw.device),
+                            torch.where(is_item,   torch.tensor(1, device=raw.device),
+                            torch.where(is_user,   torch.tensor(2, device=raw.device),
+                                                    torch.tensor(3, device=raw.device))))
+                hidden = hidden + self.type_embed(type_ids)           
  
         # Dot product to get final scores
         scores = self.W_final(hidden).squeeze(-1)   
