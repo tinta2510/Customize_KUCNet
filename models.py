@@ -26,10 +26,10 @@ class GNNLayer(torch.nn.Module):
         # self.Wqr_attn = nn.Linear(in_dim, attn_dim)
         # self.w_alpha  = nn.Linear(attn_dim, 1)
 
-        self.W_h = nn.Linear(in_dim, out_dim, bias=False)   
+        # self.W_h = nn.Linear(in_dim, out_dim, bias=False)   
         
         # n_rel*2 (inverse rels) + 1 (self-loop) + 2 (user-item, item-user)
-        self.rel_alpha = nn.Embedding(2*n_rel+1+2, 1)
+        self.rel_alpha = nn.Embedding(2*n_rel+1+2, in_dim)
         nn.init.ones_(self.rel_alpha.weight) 
         
     def forward(self, q_sub, q_rel, hidden, edges, nodes, id_layer, n_layer ,old_nodes_new_idx):
