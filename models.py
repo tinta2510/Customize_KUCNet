@@ -193,12 +193,34 @@ class KUCNet_trans(torch.nn.Module):
             # edges: after pruning
             hidden, nodes, final_nodes, old_nodes_new_idx, sampled_nodes_idx, alpha, edges = self.gnn_layers[i](q_sub, q_rel, hidden, edges, nodes, i, self.n_layer,old_nodes_new_idx)
             
-            if i == self.n_layer - 1:
-                # Copy the old h0 into the positions that correspond to the old nodes’ new indices.
-                h0 = torch.zeros(1, nodes.size(0), hidden.size(1)).cuda().index_copy_(1, old_nodes_new_idx, h0)#此处删去一个cuda()
-                h0 = h0[0, sampled_nodes_idx, :].unsqueeze(0) # only keep item-type nodes for final layer
+        if i == self.n_layer - 1:
+            h0_new = torch.zeros(1, nodes.size(0), hidden.size(1)).cuda()
+            # old_nodes_new_idx maps: position in sorted old head_index -> new position
+            # We need to preserve h0 values for nodes that still exist
+            if len(old_nodes_new_idx) > 0:
+                # old_nodes_new_idx gives new positions for old nodes that have identity edges
+                # We need to figure out which positions in old h0 correspond to these
+                # Since identity edges preserve nodes, head_index[idd_mask] gives the old positions
+                # After sorting, we get the mapping
+                old_positions = torch.arange(len(old_nodes_new_idx)).cuda()
+                # Ensure indices are in bounds
+                valid_mask = (old_positions < h0.size(1)) & (old_nodes_new_idx < h0_new.size(1))
+                if valid_mask.any():
+                    h0_new[:, old_nodes_new_idx[valid_mask], :] = h0[:, old_positions[valid_mask], :]
+            h0 = h0_new[:, sampled_nodes_idx, :]
+            if h0.size(1) > 0:
+                h0 = h0.unsqueeze(0) if h0.dim() == 2 else h0
             else:
-                h0 = torch.zeros(1, nodes.size(0), hidden.size(1)).cuda().index_copy_(1, old_nodes_new_idx, h0)
+                h0 = torch.zeros(1, 1, hidden.size(1)).cuda()
+        else:
+            h0_new = torch.zeros(1, nodes.size(0), hidden.size(1)).cuda()
+            if len(old_nodes_new_idx) > 0:
+                old_positions = torch.arange(len(old_nodes_new_idx)).cuda()
+                # Ensure indices are in bounds
+                valid_mask = (old_positions < h0.size(1)) & (old_nodes_new_idx < h0_new.size(1))
+                if valid_mask.any():
+                    h0_new[:, old_nodes_new_idx[valid_mask], :] = h0[:, old_positions[valid_mask], :]
+            h0 = h0_new
             
             hidden = self.dropout(hidden)
             # Pass hidden and h0 through the GRU gate to get updated hidden (h0) and output (hidden)
