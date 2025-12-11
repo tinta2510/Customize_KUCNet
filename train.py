@@ -67,7 +67,7 @@ if __name__ == '__main__':
         opts.n_batch = 10
         opts.n_tbatch = 10
         opts.K = 70
-    elif dataset in ['last-fm', 'last-fm-reproduce']:
+    elif dataset in ['last-fm', 'last-fm-reproduce', 'last-fm-subset']:
         opts.lr = 0.0004
         opts.decay_rate = 0.994
         opts.lamb = 0.00014
