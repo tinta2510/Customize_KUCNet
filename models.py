@@ -128,7 +128,7 @@ class KUCNet_trans(torch.nn.Module):
         self.W_final = nn.Linear(self.hidden_dim, 1, bias=False)         # get score
         self.gate = nn.GRU(self.hidden_dim, self.hidden_dim)
 
-    def forward(self, subs, rels, mode='train'):
+    def forward(self, subs, rels, mode="train", test_user_set=None):
         n = len(subs)
 
         q_sub = torch.LongTensor(subs).cuda()
@@ -139,11 +139,27 @@ class KUCNet_trans(torch.nn.Module):
         hidden = torch.zeros(n, self.hidden_dim).cuda()  
 
         scores_all = []
+                
+        # --- LOGGING ---
+        if mode == 'test':
+            subgraph_sizes_before_sampling = []
+            subgraph_sizes = [] # Subgraph sizes per layer
+        # --------------
 
         for i in range(self.n_layer):
             nodes, edges, old_nodes_new_idx = self.loader.get_neighbors(nodes.data.cpu().numpy(), mode=mode)
+                        
+            # --- LOGGING ---
+            if mode == 'test':
+                subgraph_sizes_before_sampling.append(nodes.shape[0])
+            # --------------
             
             hidden, nodes, final_nodes, old_nodes_new_idx, sampled_nodes_idx, alpha, edges = self.gnn_layers[i](q_sub, q_rel, hidden, edges, nodes, i, self.n_layer,old_nodes_new_idx)
+            
+            # --- LOGGING ---
+            if mode == 'test':
+                subgraph_sizes.append(nodes.shape[0])
+            # --------------
             
             if i == self.n_layer - 1:
                 h0 = torch.zeros(1, nodes.size(0), hidden.size(1)).cuda().index_copy_(1, old_nodes_new_idx, h0)#此处删去一个cuda()
@@ -161,5 +177,45 @@ class KUCNet_trans(torch.nn.Module):
         scores_all = torch.zeros((n, self.n_items)).cuda()  
         scores_all[[final_nodes[:,0], final_nodes[:,1]-self.n_users]] = scores   
         
-        return scores_all     
+        # --- LOGGING ---
+        # Compute statistics per batch instance
+        if mode == 'test':
+            num_answer_items_retained = []  # Number of positive items retained in final subgraph
+            num_pos_items = []  # Total number of positive items 
+            num_items = []  # Total number of items in final subgraph
+            
+            for b in range(n):
+                batch_mask = (final_nodes[:, 0] == b)
+                user_id = subs[b]
+
+                # Items in the final subgraph for this user
+                items_in_subgraph = final_nodes[batch_mask, 1].cpu().numpy()
+                num_items_in_subgraph = len(items_in_subgraph)
+                num_items.append(num_items_in_subgraph)
+                
+                # Count how many positive (answer) items are retained
+                if test_user_set is not None and user_id in test_user_set:
+                    positive_items = set(test_user_set[user_id])
+                    items_in_subgraph_set = set(items_in_subgraph)
+                    num_positive_retained = len(positive_items & items_in_subgraph_set)
+                    num_answer_items_retained.append(num_positive_retained)
+                    num_pos_items.append(len(positive_items))
+                else:
+                    # If test_user_set not provided, we can't compute this
+                    print("[WARNING] test_user_set not provided or user_id not in test_user_set; cannot compute num_answer_items.")
+                    num_answer_items_retained.append(0)
+                    num_pos_items.append(0)
+            subgraph_info = {
+                'subgraph_sizes_before_sampling': subgraph_sizes_before_sampling,  # List of sizes before sampling at each layer
+                'subgraph_sizes_per_layer': subgraph_sizes,  # List of sizes after each layer
+                'num_answer_items_retained': num_answer_items_retained,  # List per batch instance: # positive items retained
+                'num_pos_items': num_pos_items,  # List per batch instance: total positive items
+                'num_items': num_items,  # List per batch instance: total items in final subgraph
+                'number_of_subgraphs': n,  # Number of subgraphs (batch size)
+            }
+        else:
+            subgraph_info = None
+        # --------------
+        
+        return scores_all, subgraph_info
  
